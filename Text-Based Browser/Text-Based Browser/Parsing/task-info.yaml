@@ -1,0 +1,180 @@
+type: edu
+custom_name: stage5
+files:
+- name: tests.py
+  visible: false
+  text: |
+    from hstest.stage_test import StageTest
+    from hstest.test_case import TestCase
+    from hstest.check_result import CheckResult
+
+    import os
+    import shutil
+
+    import sys
+    if sys.platform.startswith("win"):
+        import _locale
+        # pylint: disable=protected-access
+        _locale._getdefaultlocale = (lambda *args: ['en_US', 'utf8'])
+
+    CheckResult.correct = lambda: CheckResult(True, '')
+    CheckResult.wrong = lambda feedback: CheckResult(False, feedback)
+
+
+    class TextBasedBrowserTest(StageTest):
+
+        def generate(self):
+
+            dir_for_files = os.path.join(os.curdir, 'tb_tabs')
+            return [
+                TestCase(
+                    stdin='3.python-requests.org\nexit',
+                    attach='requests',
+                    args=[dir_for_files]
+                ),
+                TestCase(
+                    stdin='nytimes.com\nnytimes\nexit',
+                    attach='The New York Times',
+                    args=[dir_for_files]
+                ),
+                TestCase(
+                    stdin='nytimescom\nexit',
+                    args=[dir_for_files]
+                ),
+                TestCase(
+                    stdin='bloombergcom\nexit',
+                    args=[dir_for_files]
+                ),
+            ]
+
+        def _check_files(self, path_for_tabs: str, right_word: str) -> bool:
+            """
+            Helper which checks that browser saves visited url in files and
+            provides access to them.
+
+            :param path_for_tabs: directory which must contain saved tabs
+            :param right_word: Word-marker which must be in right tab
+            :return: True, if right_words is present in saved tab
+            """
+
+            path, dirs, filenames = next(os.walk(path_for_tabs))
+
+            for file in filenames:
+
+                with open(os.path.join(path_for_tabs, file), 'r', encoding='utf-8') as tab:
+                    content = tab.read()
+
+                    if '</p>' not in content and '</script>' not in content:
+                        if '</div>' not in content and right_word in content:
+                            return True
+
+            return False
+
+        def check(self, reply, attach):
+
+            # Incorrect URL
+            if attach is None:
+                if '<p>' in reply:
+                    return CheckResult.wrong('You haven\'t checked was URL correct')
+                else:
+                    return CheckResult.correct()
+
+            # Correct URL
+            if isinstance(attach, str):
+                right_word = attach
+
+                path_for_tabs = os.path.join(os.curdir, 'tb_tabs')
+
+                if not os.path.isdir(path_for_tabs):
+                    return CheckResult.wrong("There are no directory for tabs")
+
+                if not self._check_files(path_for_tabs, right_word):
+                    return CheckResult.wrong('There are no correct saved tabs')
+
+                shutil.rmtree(path_for_tabs)
+
+                if '</p>' not in reply and '</div>' not in reply:
+                    if right_word in reply:
+                        return CheckResult.correct()
+
+                return CheckResult.wrong('You haven\'t parsed result of request')
+
+
+    TextBasedBrowserTest('browser.browser').run_tests()
+  learner_created: false
+- name: browser/browser.py
+  visible: true
+  text: "import sys\nimport os\nfrom collections import deque\n\n\nnytimes_com = '''\n\
+    This New Liquid Is Magnetic, and Mesmerizing\n\nScientists have created “soft”\
+    \ magnets that can flow \nand change shape, and that could be a boon to medicine\
+    \ \nand robotics. (Source: New York Times)\n\n\nMost Wikipedia Profiles Are of\
+    \ Men. This Scientist Is Changing That.\n\nJessica Wade has added nearly 700 Wikipedia\
+    \ biographies for\n important female and minority scientists in less than two\
+    \ \n years.\n\n'''\n\nbloomberg_com = '''\nThe Space Race: From Apollo 11 to Elon\
+    \ Musk\n\nIt's 50 years since the world was gripped by historic images\n of Apollo\
+    \ 11, and Neil Armstrong -- the first man to walk \n on the moon. It was the height\
+    \ of the Cold War, and the charts\n were filled with David Bowie's Space Oddity,\
+    \ and Creedence's \n Bad Moon Rising. The world is a very different place than\
+    \ \n it was 5 decades ago. But how has the space race changed since\n the summer\
+    \ of '69? (Source: Bloomberg)\n\n\nTwitter CEO Jack Dorsey Gives Talk at Apple\
+    \ Headquarters\n\nTwitter and Square Chief Executive Officer Jack Dorsey \n addressed\
+    \ Apple Inc. employees at the iPhone maker’s headquarters\n Tuesday, a signal\
+    \ of the strong ties between the Silicon Valley giants.\n'''\n\nif len(sys.argv)\
+    \ == 2:\n    dir_name = sys.argv[1]\n    websites = {'bloomberg': bloomberg_com,\
+    \ 'nytimes': nytimes_com}\n    history = deque()\n\n    # Create target Directory\n\
+    \    try:\n        os.mkdir(dir_name)\n        print(\"Directory \", dir_name,\
+    \ \" created \")\n    except FileExistsError:\n        print(\"Directory \", dir_name,\
+    \ \" already exists\")\n\n    # main loop\n    while True:\n        url = input()\n\
+    \        if url == 'exit':\n            break\n        elif url == 'back':\n \
+    \           try:\n                history.pop()\n                print(websites[history[-1]])\n\
+    \            except IndexError:\n                pass\n        elif '.' not in\
+    \ url:\n            try:\n                with open(f\"{dir_name}/{url}.txt\"\
+    , \"r\", encoding=\"utf-8\") as f:\n                    print(f.read())\n    \
+    \            history.append(url)\n            except FileNotFoundError:\n    \
+    \            print(\"Error: Incorrect URL\")\n        else:\n            try:\n\
+    \                url_name = url.rsplit(\".\", 1)[0]\n                print(websites[url_name])\n\
+    \                history.append(url_name)\n                with open(f\"{dir_name}/{url_name}.txt\"\
+    , \"w\", encoding=\"utf-8\") as f:\n                    f.write(websites[url_name])\n\
+    \            except KeyError:\n                print(\"Error: Incorrect URL\"\
+    )\nelse:\n    print(\"Add folder name\")\n"
+  learner_created: true
+- name: browser/site_folder/ranslate.yandex.txt
+  visible: true
+  learner_created: true
+- name: browser/site_folder/yandex.txt
+  visible: true
+  learner_created: true
+- name: browser/site_folder/nytimes.txt
+  visible: true
+  text: "\nThis New Liquid Is Magnetic, and Mesmerizing\n\nScientists have created\
+    \ “soft” magnets that can flow \nand change shape, and that could be a boon to\
+    \ medicine \nand robotics. (Source: New York Times)\n\n\nMost Wikipedia Profiles\
+    \ Are of Men. This Scientist Is Changing That.\n\nJessica Wade has added nearly\
+    \ 700 Wikipedia biographies for\n important female and minority scientists in\
+    \ less than two \n years.\n\n"
+  learner_created: true
+- name: browser/site_folder/google.txt
+  visible: true
+  learner_created: true
+- name: browser/site_folder/bloomberg.txt
+  visible: true
+  text: "\nThe Space Race: From Apollo 11 to Elon Musk\n\nIt's 50 years since the\
+    \ world was gripped by historic images\n of Apollo 11, and Neil Armstrong -- the\
+    \ first man to walk \n on the moon. It was the height of the Cold War, and the\
+    \ charts\n were filled with David Bowie's Space Oddity, and Creedence's \n Bad\
+    \ Moon Rising. The world is a very different place than \n it was 5 decades ago.\
+    \ But how has the space race changed since\n the summer of '69? (Source: Bloomberg)\n\
+    \n\nTwitter CEO Jack Dorsey Gives Talk at Apple Headquarters\n\nTwitter and Square\
+    \ Chief Executive Officer Jack Dorsey \n addressed Apple Inc. employees at the\
+    \ iPhone maker’s headquarters\n Tuesday, a signal of the strong ties between the\
+    \ Silicon Valley giants.\n"
+  learner_created: true
+- name: browser/site_folder/ranslate.google.txt
+  visible: true
+  learner_created: true
+- name: browser/site_folder/docs.python.txt
+  visible: true
+  learner_created: true
+feedback_link: https://hyperskill.org/projects/79/stages/440/implement
+status: Solved
+record: -1
